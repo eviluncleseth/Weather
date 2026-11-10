@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aktuelles Wetter (Open-Meteo)</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+           background-image: url(pixel\ space.gif);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .weather-card {
+            background: rgb(0, 0, 0);
+            padding: 2rem 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(72, 26, 24, 0.936);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.5rem;
+            color: rgba(242, 237, 216, 0.936);
+            margin-top: 0;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid rgba(242, 237, 216, 0.936);
+            padding-bottom: 0.75rem;
+        }
+        .temperature {
+            font-size: 4rem;
+            font-weight: 700;
+            color: rgba(242, 237, 216, 0.936);
+            line-height: 1.1;
+            margin: 0.5rem 0;
+        }
+        .unit {
+            font-size: 1.5rem;
+            font-weight: 400;
+            color: rgba(242, 237, 216, 0.936);
+            vertical-align: super;
+        }
+        .details {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1.5rem;
+            color: rgba(242, 237, 216, 0.936);
+            font-size: 1rem;
+        }
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .detail-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(242, 237, 216, 0.936);
+        }
+        .detail-value {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        .status {
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: rgba(242, 237, 216, 0.936);
+        }
+        .error {
+            color: #dc2626;
+            background: #fef2f2;
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="weather-card" id="weatherCard">
+    <h1>Wetter wird geladen …</h1>
+    <div class="temperature">–<span class="unit">°C</span></div>
+    <div class="details">
+        <div class="detail-item">
+            <span class="detail-label">Wind</span>
+            <span class="detail-value" id="windValue">–</span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Luftfeuchte</span>
+            <span class="detail-value" id="humidityValue">–</span>
+        </div>
+    </div>
+    <div class="status" id="statusText">Rufe Open-Meteo API auf …</div>
+</div>
+
+<script>
+    (function() {
+        // === Koordinaten hier anpassen ===
+        // Standard: Berlin (52.52, 13.41)
+        const latitude = 52.52;
+        const longitude = 13.41;
+
+        // API-URL für aktuelle Wetterdaten
+        // Dokumentation: https://open-meteo.com/en/docs
+        const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m&timezone=auto`;
+
+        const weatherCard = document.getElementById('weatherCard');
+        const statusText = document.getElementById('statusText');
+
+        // WMO Weather interpretation codes (für eine grobe textuelle Beschreibung)
+        // Quelle: https://open-meteo.com/en/docs (WMO Weather interpretation codes)
+        function getWeatherDescription(code) {
+            if (code === 0) return 'Klarer Himmel';
+            if (code === 1) return 'Überwiegend klar';
+            if (code === 2) return 'Teilweise bewölkt';
+            if (code === 3) return 'Bedeckt';
+            if (code === 45 || code === 48) return 'Nebel';
+            if (code >= 51 && code <= 55) return 'Nieselregen';
+            if (code >= 56 && code <= 57) return 'Gefrierender Nieselregen';
+            if (code >= 61 && code <= 65) return 'Regen';
+            if (code >= 66 && code <= 67) return 'Gefrierender Regen';
+            if (code >= 71 && code <= 77) return 'Schneefall';
+            if (code >= 80 && code <= 82) return 'Regenschauer';
+            if (code >= 85 && code <= 86) return 'Schneeschauer';
+            if (code === 95) return 'Gewitter';
+            if (code >= 96 && code <= 99) return 'Gewitter mit Hagel';
+            return 'Unbekannt';
+        }
+
+        // Fetch-Funktion
+        fetch(apiUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP-Fehler: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Open-Meteo Antwort:', data);
+
+                // Überprüfen, ob 'current' vorhanden ist
+                if (!data.current) {
+                    throw new Error('Keine aktuellen Wetterdaten in der Antwort gefunden.');
+                }
+
+                const current = data.current;
+                const temp = current.temperature_2m;
+                const wind = current.wind_speed_10m;
+                const humidity = current.relative_humidity_2m;
+                // Weather code ist nicht immer in 'current' enthalten, wenn nicht explizit angefragt.
+                // Wir haben ihn oben nicht angefragt, daher nutzen wir ihn hier nicht zwingend.
+                // Falls du ihn willst, füge 'weather_code' zur current-Liste in der URL hinzu.
+
+                // UI aktualisieren
+                weatherCard.innerHTML = `
+                    <h1>${getWeatherDescription(current.weather_code || 0)}</h1>
+                    <div class="temperature">${Math.round(temp)}<span class="unit">°C</span></div>
+                    <div class="details">
+                        <div class="detail-item">
+                            <span class="detail-label">Wind</span>
+                            <span class="detail-value">${Math.round(wind)} km/h</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Luftfeuchte</span>
+                            <span class="detail-value">${humidity} %</span>
+                        </div>
+                    </div>
+                    <div class="status">
+                        Quelle: Open-Meteo.com · ${new Date(current.time).toLocaleString('de-DE')}
+                    </div>
+                `;
+            })
+            .catch(error => {
+                console.error('Fehler beim Abrufen der Wetterdaten:', error);
+                weatherCard.innerHTML = `
+                    <h1>Fehler</h1>
+                    <div class="error">
+                        Die Wetterdaten konnten nicht geladen werden.<br>
+                        ${error.message}
+                    </div>
+                `;
+            });
+    })();
+</script>
+
+</body>
+</html>
